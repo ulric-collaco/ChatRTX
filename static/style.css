@@ -1,0 +1,88 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&display=swap');
+
+body {
+    background-color: aquamarine;
+    color: brown;
+    font-family: 'Open Sans', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.mainhead {
+    text-align: center;
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+    margin-top: 0px;
+}
+
+#chatbox {
+    display: flex;  /* Enables flexible alignment */
+    flex-direction: column;  /* Stacks messages vertically */
+    align-items: flex-start;  /* Aligns text to the left inside */
+    
+    width: 90%;  /* Adjust as needed */
+    height: 500px; /* Fixed height for better structure */
+    margin: auto;  /* Centers the box */
+    padding: 15px;
+    
+    background-color: rgb(190, 248, 228);
+    border: 1px solid black;
+    font-size: large;
+    font-family: 'Open Sans', sans-serif;
+    overflow-y: auto; /* Enables scrolling for long messages */
+}
+
+
+/* Input Field */
+.main_input {
+    width: 500px;
+    height: 35px;
+    padding: 5px;
+    border-radius: 10px;
+    border: 1px solid #444;
+    outline: none;
+    font-size: 1rem;
+}
+
+/* Button */
+.main_submit {
+    height: 35px;
+    width: 90px;
+    background-color: green;
+    border-radius: 25px;
+    font-size: large;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.main_submit:hover {
+    background-color: darkgreen;
+}
+.end{
+    height: 35px;
+    width: 90px;
+    background-color: rgb(128, 0, 0);
+    border-radius: 25px;
+    font-size: large;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+.end:hover {
+    background-color: rgb(237, 2, 2);
+}
+
+/* Centering Form */
+form {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 15px;
+}

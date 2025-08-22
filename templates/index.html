@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>ChatRtx</title>
+</head>
+<body>
+    <div class="container">
+        <h1>ChatRtx</h1>
+        
+        <div class="chat-history">
+            {% for message in chat_hist %}
+                <div class="message {{ message.role }}">
+                    <strong>{{ message.role.title() }}:</strong> {{ message.content }}
+                </div>
+            {% endfor %}
+        </div>
+        
+        <form method="post" class="message-form">
+            <input type="text" name="main" placeholder="Type your message here..." required>
+            <button type="submit">Send</button>
+        </form>
+        
+        <a href="/end" class="end-link">End Chat</a>
+    </div>
+</body>
+</html>
