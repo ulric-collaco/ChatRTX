@@ -1,29 +1,87 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <title>ChatRtx</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ChatRtx</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="logo" />
         <h1>ChatRtx</h1>
-        
-        <div class="chat-history">
-            {% for message in chat_hist %}
-                <div class="message {{ message.role }}">
-                    <strong>{{ message.role.title() }}:</strong> {{ message.content }}
-                </div>
-            {% endfor %}
-        </div>
-        
-        <form method="post" class="message-form">
-            <input type="text" name="main" placeholder="Type your message here..." required>
-            <button type="submit">Send</button>
+      </div>
+      <nav class="sidebar-actions">
+        <form action="{{ url_for('end') }}" method="get">
+          <button type="submit" class="btn ghost">Stop Model</button>
         </form>
-        
-        <a href="/end" class="end-link">End Chat</a>
-    </div>
+      </nav>
+      <footer class="sidebar-foot">Local RAG — offline LLM demo</footer>
+    </aside>
+
+    <main class="chat-panel">
+      <header class="chat-header">
+        <div>
+          <h2>ChatRtx</h2>
+          <p class="muted">Interactive chat with local Ollama model</p>
+        </div>
+      </header>
+
+      <section id="messages" class="messages" aria-live="polite">
+        {% for m in chat_hist %}
+          {% if m.role == 'user' %}
+            <div class="message-row user">
+              <div class="message-bubble">
+                <div class="meta">You</div>
+                <div class="content">{{ m.content | e }}</div>
+              </div>
+            </div>
+          {% else %}
+            <div class="message-row assistant">
+              <div class="message-bubble">
+                <div class="meta">Assistant</div>
+                <div class="content">{{ m.content | e }}</div>
+              </div>
+            </div>
+          {% endif %}
+        {% else %}
+          <div class="message-row assistant">
+            <div class="message-bubble">
+              <div class="meta">Assistant</div>
+              <div class="content">Hello — ask me anything.</div>
+            </div>
+          </div>
+        {% endfor %}
+      </section>
+
+      <form action="{{ url_for('index') }}" method="post" class="composer" autocomplete="off">
+        <textarea id="main" name="main" placeholder="Send a message..." rows="1" required></textarea>
+        <div class="composer-actions">
+          <button type="submit" class="btn primary">Send</button>
+        </div>
+      </form>
+    </main>
+  </div>
+
+<script>
+  // auto-expand textarea and auto-scroll
+  const ta = document.getElementById('main');
+  if(ta){
+    ta.addEventListener('input', e => {
+      ta.style.height = 'auto';
+      ta.style.height = (ta.scrollHeight) + 'px';
+    });
+  }
+  const messages = document.getElementById('messages');
+  if(messages){
+    messages.scrollTop = messages.scrollHeight;
+  }
+  window.onload = () => {
+    if(messages) messages.scrollTop = messages.scrollHeight;
+    if(ta) ta.focus();
+  };
+</script>
 </body>
 </html>

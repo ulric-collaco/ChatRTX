@@ -33,7 +33,7 @@ def index():
         chat_hist.append({"role": "user", "content": " " + user_message})  # saves the user message in a specified format
 
         response = ollama.chat(
-            model="mistral",
+            model="gemma3:4b",
             messages=chat_hist  # sends the message to the model
         )
         ai_response = response["message"]["content"]
