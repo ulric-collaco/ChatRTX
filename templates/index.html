@@ -1,87 +1,112 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ChatRtx</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta charset="utf-8" />
+    <title>ChatRtx</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
+  <div class="app">
+    <header class="app-header">
       <div class="brand">
-        <img src="{{ url_for('static', filename='logo.png') }}" alt="logo" />
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="logo" class="logo"/>
         <h1>ChatRtx</h1>
       </div>
-      <nav class="sidebar-actions">
-        <form action="{{ url_for('end') }}" method="get">
-          <button type="submit" class="btn ghost">Stop Model</button>
-        </form>
-      </nav>
-      <footer class="sidebar-foot">Local RAG — offline LLM demo</footer>
-    </aside>
+      <a class="end-btn" href="{{ url_for('end') }}">End session</a>
+    </header>
 
-    <main class="chat-panel">
-      <header class="chat-header">
-        <div>
-          <h2>ChatRtx</h2>
-          <p class="muted">Interactive chat with local Ollama model</p>
-        </div>
-      </header>
-
-      <section id="messages" class="messages" aria-live="polite">
-        {% for m in chat_hist %}
-          {% if m.role == 'user' %}
-            <div class="message-row user">
-              <div class="message-bubble">
-                <div class="meta">You</div>
-                <div class="content">{{ m.content | e }}</div>
-              </div>
-            </div>
-          {% else %}
-            <div class="message-row assistant">
-              <div class="message-bubble">
-                <div class="meta">Assistant</div>
-                <div class="content">{{ m.content | e }}</div>
-              </div>
-            </div>
-          {% endif %}
-        {% else %}
-          <div class="message-row assistant">
-            <div class="message-bubble">
-              <div class="meta">Assistant</div>
-              <div class="content">Hello — ask me anything.</div>
+    <main class="chat-wrap">
+      <div id="messages" class="messages">
+        {% for msg in chat_hist %}
+          <div class="message {{ 'user' if msg.role=='user' else 'assistant' }}">
+            <div class="bubble">
+              <div class="role">{{ msg.role }}</div>
+              <div class="content">{{ msg.content }}</div>
             </div>
           </div>
+        {% else %}
+          <div class="muted">Start the conversation — ask anything.</div>
         {% endfor %}
-      </section>
+      </div>
 
-      <form action="{{ url_for('index') }}" method="post" class="composer" autocomplete="off">
-        <textarea id="main" name="main" placeholder="Send a message..." rows="1" required></textarea>
-        <div class="composer-actions">
-          <button type="submit" class="btn primary">Send</button>
-        </div>
+      <form id="inputForm" class="input-area" onsubmit="return false;">
+        <textarea id="mainInput" name="main" rows="2" placeholder="Type your message..." required></textarea>
+        <button id="sendBtn" type="button" class="send-btn">Send</button>
       </form>
     </main>
   </div>
 
-<script>
-  // auto-expand textarea and auto-scroll
-  const ta = document.getElementById('main');
-  if(ta){
-    ta.addEventListener('input', e => {
-      ta.style.height = 'auto';
-      ta.style.height = (ta.scrollHeight) + 'px';
+  <script>
+    const messagesEl = document.getElementById('messages');
+    const input = document.getElementById('mainInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    function scrollToBottom() {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function makeMessageEl(role, text) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'message ' + (role === 'user' ? 'user' : 'assistant');
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      const roleEl = document.createElement('div');
+      roleEl.className = 'role';
+      roleEl.innerText = role;
+      const content = document.createElement('div');
+      content.className = 'content';
+      content.innerText = text;
+      bubble.appendChild(roleEl);
+      bubble.appendChild(content);
+      wrapper.appendChild(bubble);
+      return wrapper;
+    }
+
+    async function submitMessage() {
+      const value = input.value.trim();
+      if (!value) return;
+      // optimistic UI: append user message immediately
+      const userEl = makeMessageEl('user', value);
+      messagesEl.appendChild(userEl);
+      scrollToBottom();
+      input.value = '';
+      input.focus();
+
+      try {
+        const res = await fetch('/api/message', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({message: value})
+        });
+        const data = await res.json();
+        if (data.ok) {
+          const aiEl = makeMessageEl('assistant', data.assistant || '');
+          messagesEl.appendChild(aiEl);
+          scrollToBottom();
+        } else {
+          const errEl = makeMessageEl('assistant', data.error || 'Error');
+          messagesEl.appendChild(errEl);
+          scrollToBottom();
+        }
+      } catch (err) {
+        const errEl = makeMessageEl('assistant', 'Network error');
+        messagesEl.appendChild(errEl);
+        scrollToBottom();
+      }
+    }
+
+    // send on Enter (Shift+Enter for newline)
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        submitMessage();
+      }
     });
-  }
-  const messages = document.getElementById('messages');
-  if(messages){
-    messages.scrollTop = messages.scrollHeight;
-  }
-  window.onload = () => {
-    if(messages) messages.scrollTop = messages.scrollHeight;
-    if(ta) ta.focus();
-  };
-</script>
+    sendBtn.addEventListener('click', submitMessage);
+
+    // initial scroll
+    scrollToBottom();
+  </script>
 </body>
 </html>
