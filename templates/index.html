@@ -13,7 +13,14 @@
         <img src="{{ url_for('static', filename='logo.png') }}" alt="logo" class="logo"/>
         <h1>ChatRtx</h1>
       </div>
-      <a class="end-btn" href="{{ url_for('end') }}">End session</a>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <button id="themeToggle" class="theme-toggle" title="Toggle Dark Mode">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+        </button>
+        <a class="end-btn" href="{{ url_for('end') }}">End session</a>
+      </div>
     </header>
 
     <main class="chat-wrap">
@@ -31,19 +38,156 @@
       </div>
 
       <form id="inputForm" class="input-area" onsubmit="return false;">
+        <div class="upload-container">
+            <label for="fileInput" class="upload-btn" title="Upload Document">📎</label>
+            <input type="file" id="fileInput" style="display: none;" onchange="uploadFile()">
+        </div>
         <textarea id="mainInput" name="main" rows="2" placeholder="Type your message..." required></textarea>
         <button id="sendBtn" type="button" class="send-btn">Send</button>
       </form>
     </main>
   </div>
 
+  <!-- Floating Status Panel -->
+  <div id="status-panel">
+    <div class="status-header">
+        <div id="statusIndicator" class="status-indicator"></div>
+        <span id="statusTitle">System Ready</span>
+    </div>
+    <div id="statusMessage" class="status-message">Waiting for input...</div>
+    <div id="progressBar" class="progress-bar-bg">
+        <div id="progressFill" class="progress-bar-fill"></div>
+    </div>
+  </div>
+
   <script>
     const messagesEl = document.getElementById('messages');
     const input = document.getElementById('mainInput');
     const sendBtn = document.getElementById('sendBtn');
+    const fileInput = document.getElementById('fileInput');
+    const themeToggle = document.getElementById('themeToggle');
+
+    // Theme handling
+    function setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        
+        // Update icon
+        const svg = themeToggle.querySelector('svg');
+        if (theme === 'dark') {
+            // Sun icon
+            svg.innerHTML = '<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>';
+        } else {
+            // Moon icon
+            svg.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>';
+        }
+    }
+
+    themeToggle.addEventListener('click', () => {
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        setTheme(currentTheme === 'light' ? 'dark' : 'light');
+    });
+
+    // Init theme
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    setTheme(savedTheme);
+
+    // Status Panel Logic
+    const statusPanel = document.getElementById('status-panel');
+    const statusIndicator = document.getElementById('statusIndicator');
+    const statusTitle = document.getElementById('statusTitle');
+    const statusMessage = document.getElementById('statusMessage');
+    const progressFill = document.getElementById('progressFill');
+    const progressBar = document.getElementById('progressBar');
+
+    function updateStatusPanel(data) {
+        const { mode, message, progress, step } = data;
+
+        if (mode === 'idle') {
+            // Auto-hide after a delay if we were previously active
+            setTimeout(() => {
+                statusPanel.classList.remove('visible');
+            }, 2000);
+            return;
+        }
+
+        // Show panel
+        statusPanel.classList.add('visible');
+
+        // Update text
+        statusMessage.innerText = message;
+        
+        // Update Progress
+        if (progress > 0) {
+            progressBar.style.display = 'block';
+            progressFill.style.width = progress + '%';
+        } else {
+            progressBar.style.display = 'none';
+        }
+
+        // Update Mode Styles
+        statusIndicator.className = 'status-indicator'; // reset
+        if (mode === 'processing') {
+            statusIndicator.classList.add('processing');
+            statusTitle.innerText = 'Processing File';
+        } else if (mode === 'thinking') {
+            statusIndicator.classList.add('thinking');
+            statusTitle.innerText = 'AI Thinking';
+        } else if (mode === 'tool_call') {
+            statusIndicator.classList.add('thinking');
+            statusTitle.innerText = 'Using Tools';
+        } else if (mode === 'complete') {
+            statusIndicator.classList.add('complete');
+            statusTitle.innerText = 'Complete';
+        }
+    }
+
+    // Connect to SSE
+    const evtSource = new EventSource("/api/status/stream");
+    evtSource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        updateStatusPanel(data);
+    };
 
     function scrollToBottom() {
       messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    async function uploadFile() {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const loadingEl = makeMessageEl('assistant', `Uploading ${file.name}...`);
+        messagesEl.appendChild(loadingEl);
+        scrollToBottom();
+
+        try {
+            const res = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            
+            // Remove loading message or update it
+            loadingEl.remove();
+            
+            if (data.ok) {
+                const successEl = makeMessageEl('assistant', data.message);
+                messagesEl.appendChild(successEl);
+            } else {
+                const errEl = makeMessageEl('assistant', 'Upload failed: ' + data.error);
+                messagesEl.appendChild(errEl);
+            }
+        } catch (err) {
+            loadingEl.remove();
+            const errEl = makeMessageEl('assistant', 'Upload network error');
+            messagesEl.appendChild(errEl);
+        }
+        scrollToBottom();
+        fileInput.value = ''; // reset
     }
 
     function makeMessageEl(role, text) {

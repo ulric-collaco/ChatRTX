@@ -1,0 +1,9 @@
+flask
+ollama
+chromadb
+sentence-transformers
+pypdf
+pytesseract
+pillow
+watchdog
+psutil

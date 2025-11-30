@@ -6,53 +6,39 @@ A local implementation inspired by NVIDIA's ChatRTX and Google's NotebookLM, pro
 
 This project aims to create a self-hosted alternative to ChatRTX and NotebookLM, enabling users to chat with their documents locally while maintaining privacy and control over their data.
 
-## Current Features
+## Features
 
-- **Local Chat Interface**: Simple Flask-based web application for conversational AI
-- **Ollama Integration**: Leverages local Ollama models (currently Mistral) for chat responses
-- **Document History**: Maintains conversation context across interactions
-- **Privacy-First**: All processing happens locally, no data sent to external services
+- **Local Chat Interface**: Flask-based web application.
+- **Ollama Integration**: Uses local Ollama models (Gemma 3, Mistral, etc.).
+- **RAG Pipeline**: Automatically ingests PDFs, Images, and Text files from the `notes/` directory.
+- **Vector Database**: Uses ChromaDB for local vector storage.
+- **MCP Server**: Implements a Model Context Protocol (MCP) gateway for tool calling.
+- **File Watcher**: Automatically updates the index when files are added to `notes/`.
+- **Privacy-First**: All processing happens locally.
 
 ## Architecture
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Web Frontend  │───▶│  Flask Backend  │───▶│  Ollama Local   │
-│   (HTML/JS)     │    │   (Python)      │    │    Models       │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌─────────────────┐
-                       │   Future: MCP   │
-                       │   + RAG System  │
-                       └─────────────────┘
+d:\Coding\Projects\Python\ChatRtx\
+  ├── app.py (Entry point)
+  ├── requirements.txt
+  ├── notes/ (Watched folder for study materials)
+  ├── data/ (Vector DB persistence)
+  ├── src/
+  │   ├── llm/ (Ollama interaction)
+  │   ├── mcp/ (Tool Gateway)
+  │   ├── rag/ (Ingestion, Chunking, Vector DB)
+  │   └── ui/
+  ├── static/
+  └── templates/
 ```
-
-## Planned Features
-
-### 🔄 Model Context Protocol (MCP) Integration
-- Host MCP server for extensible AI capabilities
-- Plugin architecture for custom tools and data sources
-- Standardized protocol for AI model interactions
-
-### 📚 Retrieval Augmented Generation (RAG)
-- Document ingestion and vectorization
-- Semantic search across uploaded documents
-- Context-aware responses based on document content
-- Support for multiple document formats (PDF, DOCX, TXT, etc.)
-
-### 🌐 Enhanced UI/UX
-- Drag-and-drop document upload
-- Real-time streaming responses
-- Document source citations
-- Chat history management
 
 ## Quick Start
 
 ### Prerequisites
 - Python 3.8+
-- [Ollama](https://ollama.com/) installed and running
-- Mistral model pulled in Ollama (`ollama pull mistral`)
+- [Ollama](https://ollama.com/) installed and running.
+- Pull a model: `ollama pull gemma3:4b` (or `mistral`, `llama3`, etc. - update `app.py` if needed).
 
 ### Installation
 
@@ -64,7 +50,7 @@ This project aims to create a self-hosted alternative to ChatRTX and NotebookLM,
 
 2. Install dependencies:
    ```bash
-   pip install flask ollama psutil
+   pip install -r requirements.txt
    ```
 
 3. Start the application:
@@ -74,15 +60,16 @@ This project aims to create a self-hosted alternative to ChatRTX and NotebookLM,
 
 4. Open your browser to `http://localhost:5000`
 
+5. Drop PDF, Image, or Text files into the `notes/` folder, or use the upload button in the UI.
+
 ## Technology Stack
 
 - **Backend**: Flask (Python)
-- **AI Models**: Ollama (Local LLM hosting)
-- **Frontend**: HTML, CSS, JavaScript
-- **Planned**: 
-  - Vector Database (ChromaDB/Qdrant)
-  - MCP Server implementation
-  - Document processing pipelines
+- **AI Models**: Ollama (Local LLM)
+- **Vector DB**: ChromaDB
+- **Embeddings**: Sentence Transformers (all-MiniLM-L6-v2)
+- **OCR**: Tesseract (via pytesseract)
+- **PDF Parsing**: pypdf
 
 ## Inspiration
 
