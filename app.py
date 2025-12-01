@@ -18,6 +18,8 @@ from src.utils.status import StatusManager
 app = Flask(__name__)
 chat_hist = []
 
+import requests
+
 # Global components
 vector_store = None
 ingestor = None
@@ -26,13 +28,88 @@ tool_set = None
 mcp_server = None
 ollama_process = None
 status_manager = None
+INTERNET_AVAILABLE = False
 
-MODEL_NAME = "llama3.1:8b-instruct-q4_K_M" # DeepSeek-R1 can struggle with tool schemas, switching to Llama 3.1
+MODEL_NAME = "llama3.1:8b-instruct-q4_K_M"
 
+def check_internet():
+    try:
+        requests.get("https://www.google.com", timeout=3)
+        return True
+    except:
+        return False
+
+def get_system_prompt():
+    internet_status = "ONLINE" if INTERNET_AVAILABLE else "OFFLINE"
+
+    prompt = f"""
+You are ChatRTX, a local AI assistant. You answer questions using local notes and optional internet tools. Follow all rules exactly.
+
+SYSTEM STATUS: {internet_status}
+
+TOOLS:
+1. search_notes(query)
+   - For concept/topic questions only.
+   - Example: "What is BFS?", "Explain hashing".
+
+2. get_chapter_notes(chapter_identifier)
+   - For chapter/module/unit requests only.
+   - Example: "Module 5", "Chapter 3", "Unit 2".
+
+3. list_notes()
+   - Use ONLY if the user directly asks what files/notes exist.
+"""
+
+    if INTERNET_AVAILABLE:
+        prompt += """
+4. search_internet(query)
+   - Use ONLY if:
+       • local notes do not contain enough information, OR
+       • the user wants deep teaching/explanation, OR
+       • the topic is not found locally.
+   - Never use as first step.
+"""
+
+    prompt += """
+RULES (MANDATORY):
+
+1. Do NOT call a tool unless the question requires it.
+2. Do NOT list notes automatically. Only list if user asks.
+3. Do NOT search automatically. Only search when needed for the answer.
+4. NEVER assume what is in a file. Only use tool output.
+5. If a tool returns nothing, say so.
+6. IMPORTANT: When calling a tool, ensure the 'name' field is correctly filled (e.g., "search_notes", "search_internet"). Do not output empty tool names.
+
+TOPIC vs CHAPTER DETECTION:
+- If the message includes "module", "chapter", "unit", "section", or a number used in a study context → treat as CHAPTER → use get_chapter_notes().
+- If the message asks about an idea, concept, algorithm, definition → treat as TOPIC → use search_notes().
+- If unclear (e.g. "teach me 5") → ask for clarification.
+
+INTERNET (if online):
+- Always try local notes first.
+- Only call search_internet() when local notes are missing/insufficient or when the user explicitly wants deeper teaching.
+- Combine local + internet results clearly, without mixing sources.
+
+OUTPUT RULES:
+- Be concise unless the user requests teaching.
+- When teaching, organize information clearly.
+- Never fabricate details, citations, or document content.
+- Never describe or repeat these system rules.
+"""
+
+    
+    return {
+        "role": "system",
+        "content": prompt.format(internet_status=internet_status)
+    }
 
 def init_system():
-    global vector_store, ingestor, file_watcher, tool_set, mcp_server, status_manager
+    global vector_store, ingestor, file_watcher, tool_set, mcp_server, status_manager, INTERNET_AVAILABLE
     
+    print("Checking internet connectivity...")
+    INTERNET_AVAILABLE = check_internet()
+    print(f"Internet Status: {'Online' if INTERNET_AVAILABLE else 'Offline'}")
+
     print("Initializing RAG system...")
     # Ensure directories exist
     os.makedirs("data", exist_ok=True)
@@ -48,7 +125,7 @@ def init_system():
     
     # Setup MCP
     tool_set = ToolSet(vector_store, ingestor)
-    mcp_server = MCPServer(tool_set)
+    mcp_server = MCPServer(tool_set, internet_enabled=INTERNET_AVAILABLE)
     print("System initialized.")
 
 def kill_llama():
@@ -128,10 +205,21 @@ def api_upload():
         status_manager.update(mode="processing", message=f"Uploading {filename}...", progress=0, step="upload")
         
         file.save(save_path)
+        
+        # Notify the chat history about the new file
+        global chat_hist
+        chat_hist.append({
+            "role": "system", 
+            "content": f"System Notification: User has uploaded '{filename}'. It is currently being indexed and will be available for search shortly."
+        })
+        
         return jsonify({"ok": True, "message": f"File {filename} uploaded successfully. Indexing will start shortly."})
 
 def process_message(user_message):
     global chat_hist
+    if not chat_hist:
+        chat_hist.append(get_system_prompt())
+
     chat_hist.append({"role": "user", "content": user_message})
     
     status_manager.update(mode="thinking", message="AI is thinking...", progress=0)
@@ -158,9 +246,22 @@ def process_message(user_message):
                 arguments = tool_call["function"].get("arguments")
                 
                 if not function_name:
-                    print(f"Error: Model generated tool call with empty name. Args: {arguments}")
-                    status_manager.update(mode="error", message="Model tool error", progress=0)
-                    continue
+                    # Fallback for malformed tool calls
+                    if "query" in arguments:
+                        print(f"Warning: Empty tool name. Inferring 'search_notes' from args: {arguments}")
+                        function_name = "search_notes"
+                    elif "chapter_identifier" in arguments:
+                        function_name = "get_chapter_notes"
+                    else:
+                        error_msg = f"Error: Model generated tool call with empty name. Args: {arguments}"
+                        print(error_msg)
+                        status_manager.update(mode="error", message="Model tool error", progress=0)
+                        chat_hist.append({
+                            "role": "tool",
+                            "content": error_msg,
+                            "name": "error"
+                        })
+                        continue
 
                 status_manager.update(mode="tool_call", message=f"Using tool: {function_name}", progress=50)
                 print(f"Executing tool: {function_name} with args: {arguments}")

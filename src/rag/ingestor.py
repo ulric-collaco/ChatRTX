@@ -4,12 +4,70 @@ import pytesseract
 from PIL import Image
 import uuid
 import time
+import json
+import re
 
 class Ingestor:
     def __init__(self, chunk_size=1000, chunk_overlap=200, status_manager=None):
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.status_manager = status_manager
+        self.map_file = "data/chapter_map.json"
+        self._ensure_map_file()
+
+    def _ensure_map_file(self):
+        if not os.path.exists("data"):
+            os.makedirs("data")
+        if not os.path.exists(self.map_file):
+            with open(self.map_file, 'w') as f:
+                json.dump({}, f)
+
+    def _update_map(self, filename, content):
+        """
+        Extract chapter/module info and update the map.
+        """
+        try:
+            with open(self.map_file, 'r') as f:
+                mapping = json.load(f)
+        except:
+            mapping = {}
+
+        # 1. Check filename
+        name_lower = filename.lower()
+        patterns = [
+            r"(module|chapter|unit)\s*(\d+)",
+            r"(module|chapter|unit)-(\d+)",
+            r"(module|chapter|unit)_(\d+)"
+        ]
+        
+        found_keys = []
+        for pat in patterns:
+            match = re.search(pat, name_lower)
+            if match:
+                key = f"{match.group(1)} {match.group(2)}" # e.g. "module 5"
+                found_keys.append(key)
+
+        # 2. Check first 1000 chars of content if no filename match
+        if not found_keys and content:
+            intro = content[:1000].lower()
+            for pat in patterns:
+                match = re.search(pat, intro)
+                if match:
+                    key = f"{match.group(1)} {match.group(2)}"
+                    found_keys.append(key)
+
+        # Update mapping
+        for key in found_keys:
+            if key not in mapping:
+                mapping[key] = []
+            if filename not in mapping[key]:
+                mapping[key].append(filename)
+        
+        with open(self.map_file, 'w') as f:
+            json.dump(mapping, f, indent=2)
+        
+        if found_keys:
+            print(f"Mapped {filename} to {found_keys}")
 
     def _update_status(self, mode, message, progress=0, step=""):
         if self.status_manager:
@@ -138,6 +196,10 @@ class Ingestor:
         
         # Remove existing docs for this file to avoid duplicates
         vector_store.delete_document(filename)
+        
+        # Update chapter map
+        full_text = " ".join(documents)
+        self._update_map(filename, full_text)
         
         self._update_status("processing", f"Embedding {len(documents)} chunks...", 70, "embedding")
         vector_store.add_documents(documents, metadatas, ids)

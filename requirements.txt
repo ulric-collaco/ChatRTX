@@ -7,3 +7,6 @@ pytesseract
 pillow
 watchdog
 psutil
+requests
+python-dotenv
+google-generativeai

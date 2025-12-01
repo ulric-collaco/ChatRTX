@@ -5,6 +5,7 @@
     <title>ChatRtx</title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
   <div class="app">
@@ -200,12 +201,22 @@
       roleEl.innerText = role;
       const content = document.createElement('div');
       content.className = 'content';
-      content.innerText = text;
+      // Render Markdown
+      content.innerHTML = marked.parse(text);
       bubble.appendChild(roleEl);
       bubble.appendChild(content);
       wrapper.appendChild(bubble);
       return wrapper;
     }
+
+    // Parse existing messages on load
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.message .content').forEach(el => {
+            // We read the raw text (which might be markdown) and replace with parsed HTML
+            const rawText = el.innerText;
+            el.innerHTML = marked.parse(rawText);
+        });
+    });
 
     async function submitMessage() {
       const value = input.value.trim();
