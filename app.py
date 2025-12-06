@@ -186,6 +186,14 @@ def api_message():
     ai_response = process_message(user_message)
     return jsonify({"ok": True, "assistant": ai_response})
 
+@app.route('/api/clear', methods=['POST'])
+def api_clear():
+    global chat_hist
+    chat_hist = []
+    # Re-initialize with system prompt
+    chat_hist.append(get_system_prompt())
+    return jsonify({"ok": True})
+
 @app.route('/api/upload', methods=['POST'])
 def api_upload():
     if 'file' not in request.files:
@@ -248,8 +256,15 @@ def process_message(user_message):
                 if not function_name:
                     # Fallback for malformed tool calls
                     if "query" in arguments:
-                        print(f"Warning: Empty tool name. Inferring 'search_notes' from args: {arguments}")
-                        function_name = "search_notes"
+                        # Try to infer based on user intent
+                        last_user_msg = chat_hist[-2]["content"].lower() if len(chat_hist) >= 2 else ""
+                        # "teach" usually implies external/broad knowledge. "explain" can be local.
+                        if INTERNET_AVAILABLE and "teach" in last_user_msg and "search_internet" in [t["name"] for t in mcp_server.get_tool_definitions()]:
+                             print(f"Warning: Empty tool name. Inferring 'search_internet' from args (teaching context): {arguments}")
+                             function_name = "search_internet"
+                        else:
+                             print(f"Warning: Empty tool name. Inferring 'search_notes' from args: {arguments}")
+                             function_name = "search_notes"
                     elif "chapter_identifier" in arguments:
                         function_name = "get_chapter_notes"
                     else:

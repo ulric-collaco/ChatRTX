@@ -20,6 +20,7 @@
                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
             </svg>
         </button>
+        <button id="clearBtn" class="end-btn" style="background: #666;">Clear Chat</button>
         <a class="end-btn" href="{{ url_for('end') }}">End session</a>
       </div>
     </header>
@@ -27,12 +28,14 @@
     <main class="chat-wrap">
       <div id="messages" class="messages">
         {% for msg in chat_hist %}
+          {% if msg.role in ['user', 'assistant'] %}
           <div class="message {{ 'user' if msg.role=='user' else 'assistant' }}">
             <div class="bubble">
               <div class="role">{{ msg.role }}</div>
               <div class="content">{{ msg.content }}</div>
             </div>
           </div>
+          {% endif %}
         {% else %}
           <div class="muted">Start the conversation — ask anything.</div>
         {% endfor %}
@@ -218,9 +221,18 @@
         });
     });
 
+    const clearBtn = document.getElementById('clearBtn');
+    let isSubmitting = false;
+
     async function submitMessage() {
+      if (isSubmitting) return;
+      
       const value = input.value.trim();
       if (!value) return;
+      
+      isSubmitting = true;
+      sendBtn.disabled = true;
+      
       // optimistic UI: append user message immediately
       const userEl = makeMessageEl('user', value);
       messagesEl.appendChild(userEl);
@@ -248,8 +260,21 @@
         const errEl = makeMessageEl('assistant', 'Network error');
         messagesEl.appendChild(errEl);
         scrollToBottom();
+      } finally {
+        isSubmitting = false;
+        sendBtn.disabled = false;
       }
     }
+
+    clearBtn.addEventListener('click', async () => {
+        if (!confirm('Are you sure you want to clear the chat history?')) return;
+        try {
+            await fetch('/api/clear', { method: 'POST' });
+            messagesEl.innerHTML = '<div class="muted">Start the conversation — ask anything.</div>';
+        } catch (e) {
+            alert('Failed to clear chat');
+        }
+    });
 
     // send on Enter (Shift+Enter for newline)
     input.addEventListener('keydown', (e) => {

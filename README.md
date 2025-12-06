@@ -1,20 +1,16 @@
 # ChatRTX Clone
 
 A local implementation inspired by NVIDIA's ChatRTX and Google's NotebookLM, providing conversational AI with document understanding capabilities.
+Implemented using Ollama
 
 ## Overview
 
-This project aims to create a self-hosted alternative to ChatRTX and NotebookLM, enabling users to chat with their documents locally while maintaining privacy and control over their data.
+This project aims to create a self-hosted alternative to ChatRTX and NotebookLM, enabling users to chat with their notes and study material locally while maintaining privacy and control over their data.
 
-## Features
+## How It Works
 
-- **Local Chat Interface**: Flask-based web application.
-- **Ollama Integration**: Uses local Ollama models (Gemma 3, Mistral, etc.).
-- **RAG Pipeline**: Automatically ingests PDFs, Images, and Text files from the `notes/` directory.
-- **Vector Database**: Uses ChromaDB for local vector storage.
-- **MCP Server**: Implements a Model Context Protocol (MCP) gateway for tool calling.
-- **File Watcher**: Automatically updates the index when files are added to `notes/`.
-- **Privacy-First**: All processing happens locally.
+
+
 
 ## Architecture
 
@@ -28,7 +24,6 @@ d:\Coding\Projects\Python\ChatRtx\
   │   ├── llm/ (Ollama interaction)
   │   ├── mcp/ (Tool Gateway)
   │   ├── rag/ (Ingestion, Chunking, Vector DB)
-  │   └── ui/
   ├── static/
   └── templates/
 ```
@@ -38,29 +33,23 @@ d:\Coding\Projects\Python\ChatRtx\
 ### Prerequisites
 - Python 3.8+
 - [Ollama](https://ollama.com/) installed and running.
-- Pull a model: `ollama pull gemma3:4b` (or `mistral`, `llama3`, etc. - update `app.py` if needed).
+- Pull a model: `ollama pull gemma3:4b` 
 
 ### Installation
 
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd ChatRtx
-   ```
-
-2. Install dependencies:
+1. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Start the application:
+2. Start the application:
    ```bash
    python app.py
    ```
 
-4. Open your browser to `http://localhost:5000`
+3. Open your browser to `http://localhost:5000`
 
-5. Drop PDF, Image, or Text files into the `notes/` folder, or use the upload button in the UI.
+4. Drop PDF, Image, or Text files into the `notes/` folder, or use the upload button in the UI.
 
 ## Technology Stack
 
@@ -73,29 +62,16 @@ d:\Coding\Projects\Python\ChatRtx\
 
 ## Inspiration
 
-This project draws inspiration from:
-- **NVIDIA ChatRTX**: Local RTX-powered AI chat with document understanding
-- **Google NotebookLM**: Research-focused AI that can understand and discuss documents
-- **Local-first AI**: Emphasis on privacy, control, and offline capabilities
+I got inspired to make this project while having a conversation with my friend about ai and study. He asked me "make an ai where u can just dump notes and it will teach you that offline".I knew chatRtx existed but hadnt used it.This dropped me in a rabbit hole of trying to install it and figuring out my laptop cant run it and then trying to make my own solution
 
-## Contributing
 
-This is an early-stage project. Contributions welcome for:
-- RAG pipeline implementation
-- MCP server development
-- UI/UX improvements
-- Document processing enhancements
 
-## License
 
-[Add your license here]
+## Issues
 
-## Roadmap
+The issues i can point out from initial testings are
+1. UI
+2. Dumb Replies
 
-- [x] Basic chat interface with Ollama
-- [ ] Document upload and processing
-- [ ] RAG implementation with vector search
-- [ ] MCP server hosting
-- [ ] Multi-model support
-- [ ] Advanced document understanding
-- [ ] Export/import chat sessions
+UI can be worked on but the second and primary issue can be fixed simply by using an bigger LLM
+Bigger the LLM smarter the way it uses the tools and infomation being provided to it.

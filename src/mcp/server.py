@@ -7,7 +7,7 @@ class MCPServer:
         self.tool_definitions = [
             {
                 "name": "search_notes",
-                "description": "Search the knowledge base for text chunks relevant to a specific query. Use this only when the user asks a question that requires external information.",
+                "description": "Search the local knowledge base for text chunks relevant to a specific query. Use this when the user asks a question about concepts or topics found in their notes.",
                 "parameters": {
                     "type": "object",
                     "properties": {
