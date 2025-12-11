@@ -37,37 +37,76 @@ class Ingestor:
         patterns = [
             r"(module|chapter|unit)\s*(\d+)",
             r"(module|chapter|unit)-(\d+)",
-            r"(module|chapter|unit)_(\d+)"
+            r"(module|chapter|unit)_(\d+)",
+            # Add more flexible patterns
+            r"(module|chapter|unit)\s*([ivx]+)", # Roman numerals
+            r"(module|chapter|unit)\s*([a-z])\b" # Single letters
         ]
         
         found_keys = []
         for pat in patterns:
             match = re.search(pat, name_lower)
             if match:
-                key = f"{match.group(1)} {match.group(2)}" # e.g. "module 5"
+                # Normalize key
+                prefix = match.group(1)
+                val = match.group(2)
+                key = f"{prefix} {val}" 
                 found_keys.append(key)
 
-        # 2. Check first 1000 chars of content if no filename match
+        # 2. Check first 2000 chars of content if no filename match
+        # Also check for "Topic: X" or "Subject: Y"
         if not found_keys and content:
-            intro = content[:1000].lower()
+            intro = content[:2000].lower()
+            
+            # Standard patterns in content
             for pat in patterns:
                 match = re.search(pat, intro)
                 if match:
-                    key = f"{match.group(1)} {match.group(2)}"
+                    prefix = match.group(1)
+                    val = match.group(2)
+                    key = f"{prefix} {val}"
                     found_keys.append(key)
+            
+            # If still nothing, try to extract a title from the first few lines
+            if not found_keys:
+                lines = [l.strip() for l in intro.split('\n') if l.strip()]
+                if lines:
+                    # Use the first non-empty line as a potential "topic" key
+                    # This is a heuristic: "Graph Theory" -> "topic: graph theory"
+                    # We limit it to short titles (e.g. < 50 chars)
+                    title_candidate = lines[0]
+                    if len(title_candidate) < 50:
+                        # Clean it up
+                        clean_title = re.sub(r'[^\w\s]', '', title_candidate)
+                        key = f"topic: {clean_title}"
+                        found_keys.append(key)
 
         # Update mapping
-        for key in found_keys:
+        if found_keys:
+            for key in found_keys:
+                if key not in mapping:
+                    mapping[key] = []
+                if filename not in mapping[key]:
+                    mapping[key].append(filename)
+            
+            with open(self.map_file, 'w') as f:
+                json.dump(mapping, f, indent=2)
+            
+            print(f"Mapped {filename} to {found_keys}")
+        else:
+            # Fallback: Map to filename itself as a topic
+            # e.g. "Graph Theory.pdf" -> "topic: graph theory"
+            clean_name = os.path.splitext(filename)[0].replace('_', ' ').replace('-', ' ')
+            key = f"topic: {clean_name.lower()}"
+            
             if key not in mapping:
                 mapping[key] = []
             if filename not in mapping[key]:
                 mapping[key].append(filename)
-        
-        with open(self.map_file, 'w') as f:
-            json.dump(mapping, f, indent=2)
-        
-        if found_keys:
-            print(f"Mapped {filename} to {found_keys}")
+            
+            with open(self.map_file, 'w') as f:
+                json.dump(mapping, f, indent=2)
+            print(f"Mapped {filename} to fallback {key}")
 
     def _update_status(self, mode, message, progress=0, step=""):
         if self.status_manager:
@@ -210,3 +249,48 @@ class Ingestor:
         # Wait a moment so user sees the completion, then go idle
         time.sleep(3)
         self._update_status("idle", "")
+
+    def sync_existing_files(self, notes_dir, vector_store):
+        """
+        Scan the notes directory and ensure all files are indexed and mapped.
+        """
+        print(f"Syncing files in {notes_dir}...")
+        if not os.path.exists(notes_dir):
+            return
+
+        # Get files on disk
+        disk_files = [f for f in os.listdir(notes_dir) if os.path.isfile(os.path.join(notes_dir, f))]
+        
+        # Get files in vector store
+        indexed_files = set(vector_store.get_all_files())
+        
+        for filename in disk_files:
+            file_path = os.path.join(notes_dir, filename)
+            
+            # 1. Always try to update the map (it's fast and idempotent)
+            # We try to read a bit of content for better mapping if possible
+            content_head = ""
+            try:
+                ext = os.path.splitext(filename)[1].lower()
+                if ext == '.txt':
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content_head = f.read(1000)
+                elif ext == '.pdf':
+                    # Quick attempt to read first page text for mapping
+                    try:
+                        reader = pypdf.PdfReader(file_path)
+                        if len(reader.pages) > 0:
+                            content_head = reader.pages[0].extract_text()[:1000]
+                    except:
+                        pass
+            except:
+                pass
+            
+            self._update_map(filename, content_head)
+
+            # 2. Ingest if missing from vector store
+            if filename not in indexed_files:
+                print(f"Found unindexed file {filename}, ingesting...")
+                self.process_and_embed(file_path, vector_store)
+            else:
+                print(f"File {filename} is already indexed.")

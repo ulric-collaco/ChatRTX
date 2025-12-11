@@ -43,6 +43,10 @@ class FileWatcher:
         if not os.path.exists(self.watch_dir):
             os.makedirs(self.watch_dir)
             
+        # Sync existing files on startup
+        print("Performing initial file sync...")
+        self.ingestor.sync_existing_files(self.watch_dir, self.vector_store)
+
         event_handler = NotesHandler(self.ingestor, self.vector_store)
         self.observer.schedule(event_handler, self.watch_dir, recursive=False)
         self.observer.start()
