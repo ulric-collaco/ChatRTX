@@ -50,7 +50,7 @@ if notes not in db calls process_and_embed\
 # __init__
 specifies paths and names\
 specifies the embedding model\
-specifies the collection function used by other functions which basically changes text to numbers using the embedding function 
+specifies the variable used by other functions which basically changes text to numbers using the embedding function 
 
 ### add_documents
 adds the list of text chunks(documents) and info about each chunk (a list of dict or metadata) and ids
@@ -58,3 +58,15 @@ adds the list of text chunks(documents) and info about each chunk (a list of dic
 ### get_all_files
 gets the metadata of all chunks used to figure out what exists in the db as of now 
 
+# watcher.py
+
+### on_created/on_modified
+using the watchdog libraries event handler keeps a watch for changes
+
+### process
+this function is the most important as this is the one which calls the ingestor to process files 
+
+## Filewatcher Class
+its mainly a wrapper around watchdod library/
+it contains a start and a stop function which checks if the dir exists and asks NotesHandler to watch that dir/
+this class also creates its own instance of Ingestor

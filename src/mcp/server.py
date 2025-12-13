@@ -7,13 +7,22 @@ class MCPServer:
         self.tool_definitions = [
             {
                 "name": "search_notes",
-                "description": "Search the local knowledge base for text chunks relevant to a specific query. Use this when the user asks a question about concepts or topics found in their notes.",
+                "description": (
+                    "Search the local knowledge base (vector database) for text chunks relevant to a specific query. "
+                    "This is the primary tool for answering questions based on the user's uploaded documents. "
+                    "Use this whenever the user asks about a concept, definition, algorithm, or topic that is likely contained in their notes. "
+                    "Do NOT use this for general chit-chat or if the user explicitly asks for external information. \n\n"
+                    "Examples:\n"
+                    "- User: 'What is the definition of depreciation?' -> Tool Call: search_notes('definition of depreciation')\n"
+                    "- User: 'Explain the difference between BFS and DFS' -> Tool Call: search_notes('BFS vs DFS difference')\n"
+                    "- User: 'How does the transformer architecture work?' -> Tool Call: search_notes('transformer architecture mechanism')"
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "The specific topic or question to search for."
+                            "description": "The specific topic, concept, or question to search for in the vector database."
                         }
                     },
                     "required": ["query"]
@@ -21,7 +30,16 @@ class MCPServer:
             },
             {
                 "name": "list_notes",
-                "description": "Get a list of filenames currently in the knowledge base. Use this only when the user asks what files are available.",
+                "description": (
+                    "Retrieve a list of all filenames currently indexed in the knowledge base. "
+                    "This tool checks the database and returns the names of all available documents (PDFs, images, text files). "
+                    "Use this tool ONLY when the user explicitly asks what files are available, what notes they have uploaded, or requests an inventory of the system. "
+                    "Do NOT call this tool automatically at the start of a conversation or if the user asks a question about the *content* of the notes. \n\n"
+                    "Examples:\n"
+                    "- User: 'What files do I have?' -> Tool Call: list_notes()\n"
+                    "- User: 'List my notes' -> Tool Call: list_notes()\n"
+                    "- User: 'Show me the uploaded documents' -> Tool Call: list_notes()"
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {},
@@ -33,7 +51,18 @@ class MCPServer:
         if internet_enabled:
             self.tool_definitions.append({
                 "name": "search_internet",
-                "description": "Use Gemini API to generate comprehensive teaching notes on a topic. Use this ONLY if the user asks for external information, 'teaching', or if local notes are insufficient.",
+                "description": (
+                    "Use the Google Gemini API to generate comprehensive teaching notes, explanations, or tutorials on a topic from external knowledge. "
+                    "This tool accesses the internet/LLM knowledge base rather than local files. "
+                    "Use this tool ONLY in the following cases: "
+                    "1) The user explicitly asks to 'teach' them a topic from scratch. "
+                    "2) The user asks for information that is clearly not in their local notes (e.g., general world knowledge). "
+                    "3) The local search_notes tool returned no results, and you need a fallback. \n\n"
+                    "Examples:\n"
+                    "- User: 'Teach me about Quantum Physics like I'm 5' -> Tool Call: search_internet('Quantum Physics ELI5')\n"
+                    "- User: 'I don't have notes on this, can you explain Photosynthesis?' -> Tool Call: search_internet('Photosynthesis explanation')\n"
+                    "- User: 'Generate a study guide for Calculus' -> Tool Call: search_internet('Calculus study guide')"
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -48,7 +77,17 @@ class MCPServer:
             
         self.tool_definitions.append({
             "name": "get_chapter_notes",
-            "description": "Retrieve notes for a specific chapter, module, or unit. Use this when the user mentions 'Chapter X', 'Module Y', or just a number in a learning context.",
+            "description": (
+                "Retrieve all notes associated with a specific chapter, module, unit, or section identifier. "
+                "This tool uses a special mapping file to find documents that correspond to 'Module 5', 'Chapter 3', etc. "
+                "Use this tool whenever the user mentions a specific structural unit of their course or notes. "
+                "Do NOT use this for general topic searches (use search_notes for that). "
+                "This tool is specifically for when the user references the *organization* of the material. \n\n"
+                "Examples:\n"
+                "- User: 'Summarize Module 5' -> Tool Call: get_chapter_notes('Module 5')\n"
+                "- User: 'What is covered in Chapter 3?' -> Tool Call: get_chapter_notes('Chapter 3')\n"
+                "- User: 'Give me the notes for Unit 2' -> Tool Call: get_chapter_notes('Unit 2')"
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
