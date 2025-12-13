@@ -1,4 +1,5 @@
 # status.py
+
 ### init
 this sets up the status modes message and progress in a dict\
 default is idle with progress zero
@@ -12,3 +13,14 @@ data is formatted as an sse and is looped to every active listener
 
 ### listen
 this is used to add a llistener
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant StatusManager
+    participant UI
+    
+    UI->>StatusManager: listen()
+    App->>StatusManager: update(state)
+    StatusManager->>UI: notify_listeners(SSE)
+```
