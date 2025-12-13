@@ -45,6 +45,30 @@ class MCPServer:
                     "properties": {},
                     "required": []
                 }
+            },
+            {
+                "name": "get_chapter_notes",
+                "description": (
+                    "Retrieve all notes associated with a specific chapter, module, unit, or section identifier. "
+                    "This tool uses a special mapping file to find documents that correspond to 'Module 5', 'Chapter 3', etc. "
+                    "Use this tool whenever the user mentions a specific structural unit of their course or notes. "
+                    "Do NOT use this for general topic searches (use search_notes for that). "
+                    "This tool is specifically for when the user references the *organization* of the material. \n\n"
+                    "Examples:\n"
+                    "- User: 'Summarize Module 5' -> Tool Call: get_chapter_notes('Module 5')\n"
+                    "- User: 'What is covered in Chapter 3?' -> Tool Call: get_chapter_notes('Chapter 3')\n"
+                    "- User: 'Give me the notes for Unit 2' -> Tool Call: get_chapter_notes('Unit 2')"
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "chapter_identifier": {
+                            "type": "string",
+                            "description": "The identifier, e.g., 'Module 5', 'Chapter 3', or just '5'."
+                        }
+                    },
+                    "required": ["chapter_identifier"]
+                }
             }
         ]
         
@@ -75,38 +99,12 @@ class MCPServer:
                 }
             })
             
-        self.tool_definitions.append({
-            "name": "get_chapter_notes",
-            "description": (
-                "Retrieve all notes associated with a specific chapter, module, unit, or section identifier. "
-                "This tool uses a special mapping file to find documents that correspond to 'Module 5', 'Chapter 3', etc. "
-                "Use this tool whenever the user mentions a specific structural unit of their course or notes. "
-                "Do NOT use this for general topic searches (use search_notes for that). "
-                "This tool is specifically for when the user references the *organization* of the material. \n\n"
-                "Examples:\n"
-                "- User: 'Summarize Module 5' -> Tool Call: get_chapter_notes('Module 5')\n"
-                "- User: 'What is covered in Chapter 3?' -> Tool Call: get_chapter_notes('Chapter 3')\n"
-                "- User: 'Give me the notes for Unit 2' -> Tool Call: get_chapter_notes('Unit 2')"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "chapter_identifier": {
-                        "type": "string",
-                        "description": "The identifier, e.g., 'Module 5', 'Chapter 3', or just '5'."
-                    }
-                },
-                "required": ["chapter_identifier"]
-            }
-        })
-
     def get_tool_definitions(self):
         return self.tool_definitions
 
     def call_tool(self, tool_name, arguments):
         """
         Execute a tool call.
-        arguments can be a dict or a JSON string.
         """
         if isinstance(arguments, str):
             try:

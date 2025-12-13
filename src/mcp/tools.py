@@ -26,6 +26,7 @@ class ToolSet:
         Use Gemini API to generate comprehensive notes on a topic.
         """
         print(f"Tool Call: search_internet('{query}')")
+        print(f"Status: Generating external teaching notes for '{query}'...")
         
         if not self.gemini_model:
             return "Error: Gemini API key not configured. Please check .env file."
@@ -42,6 +43,7 @@ class ToolSet:
         Retrieve notes for a specific chapter/module using the mapping.
         """
         print(f"Tool Call: get_chapter_notes('{chapter_identifier}')")
+        print(f"Status: Resolving chapter mapping for '{chapter_identifier}'...")
         try:
             with open("data/chapter_map.json", 'r') as f:
                 mapping = json.load(f)
@@ -81,6 +83,7 @@ class ToolSet:
         Search the vector database for relevant notes.
         """
         print(f"Tool Call: search_notes('{query}')")
+        print(f"Status: Querying vector database for '{query}'...")
         results = self.vector_store.query(query)
         
         # Format results
@@ -102,6 +105,7 @@ class ToolSet:
         List all available files in the index.
         """
         print("Tool Call: list_notes()")
+        print("Status: Retrieving list of indexed files...")
         files = self.vector_store.get_all_files()
         if not files:
             return "No notes indexed."
@@ -112,6 +116,7 @@ class ToolSet:
         Manually ingest a file.
         """
         print(f"Tool Call: ingest_file('{file_path}')")
+        print(f"Status: Starting manual ingestion of '{file_path}'...")
         if not os.path.exists(file_path):
             return f"Error: File {file_path} not found."
             
