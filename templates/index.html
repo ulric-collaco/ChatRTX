@@ -28,11 +28,12 @@
     <main class="chat-wrap">
       <div id="messages" class="messages">
         {% for msg in chat_hist %}
-          {% if msg.role in ['user', 'assistant'] %}
+          {% set _content = (msg.content | default('') | trim) %}
+          {% if msg.role in ['user', 'assistant'] and _content %}
           <div class="message {{ 'user' if msg.role=='user' else 'assistant' }}">
             <div class="bubble">
               <div class="role">{{ msg.role }}</div>
-              <div class="content">{{ msg.content }}</div>
+              <div class="content">{{ _content }}</div>
             </div>
           </div>
           {% endif %}
@@ -216,9 +217,12 @@
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.message .content').forEach(el => {
             // We read the raw text (which might be markdown) and replace with parsed HTML
-            const rawText = el.innerText;
-            el.innerHTML = marked.parse(rawText);
+            const rawText = el.textContent || el.innerText;
+            if (rawText && rawText.trim()) {
+                el.innerHTML = marked.parse(rawText);
+            }
         });
+        scrollToBottom();
     });
 
     const clearBtn = document.getElementById('clearBtn');

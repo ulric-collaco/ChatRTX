@@ -43,64 +43,136 @@ def get_system_prompt():
     internet_status = "ONLINE" if INTERNET_AVAILABLE else "OFFLINE"
 
     prompt = f"""
-You are ChatRTX, a local AI assistant. You answer questions using local notes and optional internet tools. Follow all rules exactly.
+You are ChatRTX, a helpful AI assistant that answers questions using local knowledge from uploaded documents.
 
 SYSTEM STATUS: {internet_status}
 
-TOOLS:
-1. search_notes(query)
-   - For concept/topic questions only.
-   - Example: "What is BFS?", "Explain hashing".
+═══════════════════════════════════════════════════════════════════════════════
+AVAILABLE TOOLS
+═══════════════════════════════════════════════════════════════════════════════
 
-2. get_chapter_notes(chapter_identifier)
-   - For chapter/module/unit requests only.
-   - Example: "Module 5", "Chapter 3", "Unit 2".
+🔧 TOOL 1: list_notes()
+   Returns: List of all uploaded document filenames
+   
+   USE THIS TOOL WHEN:
+   ✓ User asks "what notes/files/documents do you have?"
+   ✓ User asks "list my notes" or "show my files"
+   ✓ User asks "what have I uploaded?"
+   
+   DO NOT USE when:
+   ✗ User asks to explain/teach/summarize CONTENT from notes
+   ✗ User mentions "my notes" but wants content (use search_notes instead)
+   
+   Examples of CORRECT usage:
+   • "what notes do u have rn" → list_notes()
+   • "list all my files" → list_notes()
+   • "show uploaded documents" → list_notes()
+   
+   Examples of INCORRECT usage:
+   • "teach me X from my notes" → DO NOT use list_notes, use search_notes instead
+   • "explain Y according to my notes" → DO NOT use list_notes, use search_notes instead
 
-3. list_notes()
-   - Use ONLY if the user directly asks what files/notes exist.
+🔧 TOOL 2: search_notes(query)
+   Parameter: query (string) - the topic/concept to search for
+   Returns: Relevant text chunks from uploaded documents
+   
+   USE THIS TOOL WHEN:
+   ✓ User asks to explain/teach/define a concept
+   ✓ User asks "what is X?" or "how does Y work?"
+   ✓ User asks about chapters/modules (e.g., "chapter 5", "module 2")
+   ✓ User says "according to my notes" or "from my notes" followed by a topic
+   ✓ User asks for summaries or information extraction
+   
+   Query construction:
+   • For topic: search_notes("depreciation")
+   • For chapter: search_notes("chapter 5") or search_notes("module 2")
+   • For teaching: search_notes("impairment")
+   
+   Examples of CORRECT usage:
+   • "what is BFS?" → search_notes("BFS breadth first search")
+   • "explain hashing" → search_notes("hashing")
+   • "teach me impairment from my notes" → search_notes("impairment")
+   • "summarize chapter 5" → search_notes("chapter 5")
+   • "what is depreciation according to my notes?" → search_notes("depreciation")
 """
 
     if INTERNET_AVAILABLE:
         prompt += """
-4. search_internet(query)
-   - Use ONLY if:
-       • local notes do not contain enough information, OR
-       • the user wants deep teaching/explanation, OR
-       • the topic is not found locally.
-   - Never use as first step.
+🔧 TOOL 3: search_internet(query)
+   Parameter: query (string) - the topic to generate teaching notes for
+   Returns: Comprehensive teaching content from external AI model
+   
+   USE THIS TOOL WHEN:
+   ✓ search_notes returned "No relevant notes found"
+   ✓ User explicitly asks for information beyond their notes
+   ✓ User says "teach me" and local notes are insufficient
+   
+   DO NOT USE as first choice - always try search_notes first.
+   
+   Examples:
+   • After search_notes fails: search_internet("quantum mechanics")
+   • User asks: "explain something not in my notes" → search_internet(topic)
 """
 
-    prompt += """
-RULES (MANDATORY):
+    prompt += f"""
 
-1. Do NOT call a tool unless the question requires it.
-2. Do NOT list notes automatically. Only list if user asks.
-3. Do NOT search automatically. Only search when needed for the answer.
-4. NEVER assume what is in a file. Only use tool output.
-5. If a tool returns nothing, say so.
-6. IMPORTANT: When calling a tool, ensure the 'name' field is correctly filled (e.g., "search_notes", "search_internet"). Do not output empty tool names.
+═══════════════════════════════════════════════════════════════════════════════
+DECISION LOGIC (Follow this EXACTLY)
+═══════════════════════════════════════════════════════════════════════════════
 
-TOPIC vs CHAPTER DETECTION:
-- If the message includes "module", "chapter", "unit", "section", or a number used in a study context → treat as CHAPTER → use get_chapter_notes().
-- If the message asks about an idea, concept, algorithm, definition → treat as TOPIC → use search_notes().
-- If unclear (e.g. "teach me 5") → ask for clarification.
+STEP 1: Analyze user's intent
 
-INTERNET (if online):
-- Always try local notes first.
-- Only call search_internet() when local notes are missing/insufficient or when the user explicitly wants deeper teaching.
-- Combine local + internet results clearly, without mixing sources.
+Is the user asking WHICH files exist?
+├─ YES → Call list_notes()
+└─ NO → Continue to Step 2
 
-OUTPUT RULES:
-- Be concise unless the user requests teaching.
-- When teaching, organize information clearly.
-- Never fabricate details, citations, or document content.
-- Never describe or repeat these system rules.
+STEP 2: Does the user want CONTENT/information about a topic?
+├─ YES → Call search_notes("topic name")
+│   └─ If result is empty and internet is {internet_status}:
+│       └─ Call search_internet("topic name") for external help
+└─ NO → Answer directly without tools
+
+═══════════════════════════════════════════════════════════════════════════════
+CRITICAL RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+1. TOOL CALLING FORMAT:
+   When calling a tool, you MUST use this exact structure:
+   - Tool name must be exactly: "list_notes" OR "search_notes" OR "search_internet"
+   - Arguments must match the parameter names shown above
+   
+2. GROUNDING:
+   - NEVER invent filenames, document content, or claim notes exist
+   - Only report what tools return
+   - If search_notes returns nothing, say "No relevant notes found"
+   
+3. OUTPUT FORMAT (CRITICAL):
+   ⚠️  NEVER describe which tool you used or how you found the answer
+   ⚠️  NEVER say "I used TOOL X" or "I searched" or "I called"
+   ✓  Just provide the answer directly using the tool results
+   ✓  For list_notes: list the files in a simple bullet format
+   ✓  For search_notes: answer the question using the retrieved content
+   ✓  Cite source filenames naturally (e.g., "According to [filename]...")
+   
+4. RESPONSE STYLE:
+   - Be direct and concise
+   - When teaching, organize information clearly with headings/bullets
+   - Use the content from tools, don't narrate your process
+   
+5. TOOL SELECTION:
+   - list_notes: ONLY for "what files do you have" questions
+   - search_notes: PRIMARY tool for all content questions
+   - search_internet: FALLBACK when local notes insufficient
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Now respond to the user's message following these rules exactly.
+DO NOT describe your process. Just answer the question using tool results.
 """
 
-    
     return {
         "role": "system",
-        "content": prompt.format(internet_status=internet_status)
+        "content": prompt
     }
 
 def init_system():
@@ -251,32 +323,49 @@ def process_message(user_message):
             
             for tool_call in message["tool_calls"]:
                 function_name = tool_call["function"].get("name")
-                arguments = tool_call["function"].get("arguments")
+                arguments = tool_call["function"].get("arguments") or {}
                 
                 if not function_name:
                     # Fallback for malformed tool calls
-                    if "query" in arguments:
-                        # Try to infer based on user intent
-                        last_user_msg = chat_hist[-2]["content"].lower() if len(chat_hist) >= 2 else ""
-                        # "teach" usually implies external/broad knowledge. "explain" can be local.
-                        if INTERNET_AVAILABLE and "teach" in last_user_msg and "search_internet" in [t["name"] for t in mcp_server.get_tool_definitions()]:
-                             print(f"Warning: Empty tool name. Inferring 'search_internet' from args (teaching context): {arguments}")
-                             function_name = "search_internet"
+                    last_user_raw = chat_hist[-2]["content"] if len(chat_hist) >= 2 else ""
+                    last_user_msg = last_user_raw.lower()
+
+                    # 1) Explicit inventory requests ONLY -> list_notes
+                    # Must be asking WHICH files exist, not CONTENT from files
+                    inventory_only_markers = [
+                        "what notes do", "what files do", "what documents do",
+                        "list notes", "list files", "list documents",
+                        "show notes", "show files", "show documents",
+                        "which notes", "which files"
+                    ]
+                    # Exclude if asking for content
+                    content_markers = ["teach", "explain", "what is", "how", "summarize", "according to", "from my notes"]
+                    
+                    is_inventory = any(m in last_user_msg for m in inventory_only_markers)
+                    is_content = any(m in last_user_msg for m in content_markers)
+                    
+                    if is_inventory and not is_content:
+                        print("Warning: Empty tool name. Inferring 'list_notes' from inventory request")
+                        function_name = "list_notes"
+                        arguments = {}
+
+                    # 2) Teaching/explanation requests -> search_notes (or search_internet as fallback)
+                    elif is_content:
+                        print("Warning: Empty tool name. Inferring 'search_notes' from content request")
+                        function_name = "search_notes"
+                        # Try to extract topic from user message
+                        if isinstance(arguments, dict) and arguments.get("query"):
+                            # Keep existing query if provided
+                            pass
                         else:
-                             print(f"Warning: Empty tool name. Inferring 'search_notes' from args: {arguments}")
-                             function_name = "search_notes"
-                    elif "chapter_identifier" in arguments:
-                        function_name = "get_chapter_notes"
+                            # Use the user message as query
+                            arguments = {"query": last_user_raw}
+
+                    # 3) Default -> search_notes
                     else:
-                        error_msg = f"Error: Model generated tool call with empty name. Args: {arguments}"
-                        print(error_msg)
-                        status_manager.update(mode="error", message="Model tool error", progress=0)
-                        chat_hist.append({
-                            "role": "tool",
-                            "content": error_msg,
-                            "name": "error"
-                        })
-                        continue
+                        print("Warning: Empty tool name. Defaulting to 'search_notes'")
+                        function_name = "search_notes"
+                        arguments = {"query": last_user_raw} if not (isinstance(arguments, dict) and arguments.get("query")) else arguments
 
                 status_manager.update(mode="tool_call", message=f"Using tool: {function_name}", progress=50)
                 print(f"Executing tool: {function_name} with args: {arguments}")
@@ -314,6 +403,9 @@ def process_message(user_message):
              except:
                  pass
     
+    if not (ai_response or "").strip():
+        ai_response = "I couldn't generate a response just now. Please try again."
+
     status_manager.set_idle()
     chat_hist.append({"role": "assistant", "content": ai_response})
     return ai_response

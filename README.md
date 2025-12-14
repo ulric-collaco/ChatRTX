@@ -9,8 +9,112 @@ This project aims to create a self-hosted alternative to ChatRTX and NotebookLM,
 
 ## How It Works
 
+The system follows a two-step RAG (Retrieval-Augmented Generation) process:
 
+1.  **Decision Phase**: The LLM analyzes the user's request to determine if it needs to search local notes, check chapter mappings, or (if enabled) search the internet.
+2.  **Execution Phase**: The selected tool runs and returns data (e.g., text chunks from a PDF).
+3.  **Generation Phase**: The LLM receives the tool's data and generates a final, grounded answer.
 
+### Context Window & Tool Call Flow
+
+The following diagram shows how the system prompt initializes the context, how chat history accumulates, and how a user message can trigger tool execution:
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          CONTEXT WINDOW (LLM Input)                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │ SYSTEM PROMPT (Initializes Context)                                   │  │
+│  │ "You are a helpful assistant with access to the following tools:      │  │
+│  │  - search_notes: Search through user's local notes                    │  │
+│  │  - get_chapter: Retrieve chapter mappings                             │  │
+│  │  When asked a question, decide if you need to use a tool..."          │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                    ▼                                        │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │ CHAT HISTORY (Accumulated Messages)                                   │  │
+│  │ ┌─────────────────────────────────────────────────────────────────┐   │  │
+│  │ │ [USER]: "What is recursion?"                                    │   │  │
+│  │ └─────────────────────────────────────────────────────────────────┘   │  │
+│  │ ┌─────────────────────────────────────────────────────────────────┐   │  │
+│  │ │ [ASSISTANT]: <tool_call>search_notes("recursion")</tool_call>   │   │  │
+│  │ └─────────────────────────────────────────────────────────────────┘   │  │
+│  │ ┌─────────────────────────────────────────────────────────────────┐   │  │
+│  │ │ [TOOL RESULT]: "Recursion is when a function calls itself..."   │   │  │
+│  │ └─────────────────────────────────────────────────────────────────┘   │  │
+│  │ ┌─────────────────────────────────────────────────────────────────┐   │  │
+│  │ │ [ASSISTANT]: "Recursion is a programming concept where..."      │   │  │
+│  │ └─────────────────────────────────────────────────────────────────┘   │  │
+│  │ ┌─────────────────────────────────────────────────────────────────┐   │  │
+│  │ │ [USER]: "Explain BFS" ◄──── NEW USER MESSAGE                    │   │  │
+│  │ └─────────────────────────────────────────────────────────────────┘   │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            OLLAMA LLM PROCESSING                            │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │ 1. Reads system prompt → Understands available tools                  │  │
+│  │ 2. Reviews chat history → Maintains conversation context              │  │
+│  │ 3. Analyzes new message → "Explain BFS" needs local notes             │  │
+│  │ 4. Decision: TRIGGER TOOL CALL                                        │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    ▼                               ▼
+        ┌───────────────────┐           ┌───────────────────────┐
+        │   NO TOOL NEEDED  │           │   TOOL CALL NEEDED    │
+        │   Direct Answer   │           │                       │
+        └───────────────────┘           └───────────────────────┘
+                                                    │
+                                                    ▼
+                              ┌─────────────────────────────────────────────┐
+                              │              MCP TOOL SERVER                │
+                              │  ┌───────────────────────────────────────┐  │
+                              │  │ Tool: search_notes                    │  │
+                              │  │ Args: {"query": "BFS"}                │  │
+                              │  └───────────────────────────────────────┘  │
+                              │                     │                       │
+                              │                     ▼                       │
+                              │  ┌───────────────────────────────────────┐  │
+                              │  │ EXECUTION:                            │  │
+                              │  │ 1. Embed query "BFS"                  │  │
+                              │  │ 2. Search ChromaDB                    │  │
+                              │  │ 3. Retrieve top-k chunks              │  │
+                              │  └───────────────────────────────────────┘  │
+                              │                     │                       │
+                              │                     ▼                       │
+                              │  ┌───────────────────────────────────────┐  │
+                              │  │ RESULT: "BFS (Breadth-First Search)   │  │
+                              │  │ is a graph traversal algorithm..."    │  │
+                              │  └───────────────────────────────────────┘  │
+                              └─────────────────────────────────────────────┘
+                                                    │
+                                                    ▼
+                              ┌─────────────────────────────────────────────┐
+                              │         RESULT INJECTED INTO CONTEXT        │
+                              │  Context Window now includes:               │
+                              │  - System Prompt                            │
+                              │  - Previous Chat History                    │
+                              │  - Tool Call + Tool Result  ◄── NEW         │
+                              └─────────────────────────────────────────────┘
+                                                    │
+                                                    ▼
+                              ┌─────────────────────────────────────────────┐
+                              │      LLM GENERATES FINAL RESPONSE           │
+                              │  "BFS is a graph traversal algorithm        │
+                              │   that explores all neighbors at the        │
+                              │   current depth before moving deeper..."    │
+                              └─────────────────────────────────────────────┘
+                                                    │
+                                                    ▼
+                              ┌─────────────────────────────────────────────┐
+                              │   RESPONSE ADDED TO CHAT HISTORY            │
+                              │   (Ready for next user message)             │
+                              └─────────────────────────────────────────────┘
+```
 
 ## Architecture
 
